@@ -4,12 +4,12 @@ Programmatic control of Govee smart lights via the local LAN API — no cloud, n
 
 ## Devices
 
-| Name | IP | SKU | Description |
-|---|---|---|---|
-| floor-lamp-1 | 192.168.4.28 | H6076 | Govee RGBIC Floor Lamp Basic 2 |
-| floor-lamp-2 | 192.168.4.49 | H6076 | Govee RGBIC Floor Lamp Basic 2 |
-| neon-rope-1  | 192.168.4.42 | H61D5 | Govee RGBIC Neon Rope Light 2 |
-| neon-rope-2  | 192.168.4.43 | H61D5 | Govee RGBIC Neon Rope Light 2 |
+| Name | IP | MAC | SKU | Description |
+|---|---|---|---|---|
+| floor-lamp-1 | 192.168.4.49 | 30:BA:C1:30:38:37:52:48 | H6076 | Govee RGBIC Floor Lamp Basic 2 |
+| floor-lamp-2 | 192.168.4.28 | 3D:97:EF:8D:84:C6:40:93 | H6076 | Govee RGBIC Floor Lamp Basic 2 |
+| neon-rope-black | 192.168.4.42 | 16:89:C2:32:34:39:05:54 | H61D5 | Govee RGBIC Neon Rope Light 2 |
+| neon-rope-white | 192.168.4.43 | 11:21:CF:39:32:35:3D:2A | H61D5 | Govee RGBIC Neon Rope Light 2 |
 
 ## Setup
 

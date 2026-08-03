@@ -8,10 +8,10 @@ CMD_PORT = 4003
 
 # Known devices (from discovery)
 DEVICES = {
-    "floor-lamp-1": "192.168.4.28",
-    "floor-lamp-2": "192.168.4.49",
-    "neon-rope-1":  "192.168.4.42",
-    "neon-rope-2":  "192.168.4.43",
+    "floor-lamp-1":    "192.168.4.49",
+    "floor-lamp-2":    "192.168.4.28",
+    "neon-rope-black": "192.168.4.42",
+    "neon-rope-white": "192.168.4.43",
 }
 
 
@@ -67,7 +67,8 @@ Device names: """ + ", ".join(DEVICES.keys()) + " or 'all'\n"
         sys.exit(1)
 
     cmd = sys.argv[1]
-    target = sys.argv[-1] if sys.argv[-1] in {**DEVICES, "all"} else "all"
+    valid = set(DEVICES) | {"all"}
+    target = sys.argv[-1] if sys.argv[-1] in valid else "all"
     ips = list(DEVICES.values()) if target == "all" else [DEVICES[target]]
 
     if cmd == "on":
