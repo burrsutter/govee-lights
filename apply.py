@@ -66,11 +66,11 @@ def apply_settings(name, cfg):
             turn_on(ip)
         else:
             turn_off(ip)
-        time.sleep(0.05)
+        time.sleep(0.1)
 
     if "brightness" in cfg:
         set_brightness(ip, cfg["brightness"])
-        time.sleep(0.05)
+        time.sleep(0.1)
 
     if "color" in cfg:
         r, g, b = cfg["color"]
@@ -119,7 +119,7 @@ def main():
             parts.append(f"white={cfg['white']}K")
         apply_settings(name, cfg)
         print(f"  {name}: {', '.join(parts)}")
-        time.sleep(0.05)
+        time.sleep(0.1)
 
     print("Done.")
 

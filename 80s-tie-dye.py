@@ -25,10 +25,10 @@ def main():
     # Turn everything on bright
     for ip in DEVICES.values():
         turn_on(ip)
-        time.sleep(0.05)
+        time.sleep(0.1)
     for ip in DEVICES.values():
         set_brightness(ip, 100)
-        time.sleep(0.05)
+        time.sleep(0.1)
 
     print("~ 80s Tie-Dye Mode ~")
     print(f"  {len(PALETTE)} colors, {TOTAL_TIME}s, {CYCLE_TIME}s per shift\n")
@@ -39,7 +39,7 @@ def main():
             color_idx = (step + i) % len(PALETTE)
             r, g, b = PALETTE[color_idx]
             set_color(DEVICES[name], r, g, b)
-            time.sleep(0.05)
+            time.sleep(0.1)
 
         colors = [PALETTE[(step + i) % len(PALETTE)] for i in range(len(DEVICE_NAMES))]
         labels = " | ".join(
