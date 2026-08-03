@@ -16,9 +16,8 @@ Programmatic control of Govee smart lights via the local LAN API — no cloud, n
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
+pip install -r requirements.txt
 ```
-
-No external dependencies — uses only Python stdlib (`socket`, `json`).
 
 ## Usage
 
@@ -33,6 +32,47 @@ python control.py color 255 0 128 neon-rope-1
 python control.py white 4000 all
 python control.py dim 30 all
 ```
+
+### Scenes
+
+Define reusable presets as YAML files in `scenes/` and apply them with one command:
+
+```bash
+python apply.py movie-night          # load scenes/movie-night.yaml
+python apply.py scenes/custom.yaml   # or pass a direct path
+python apply.py --list               # list available scenes
+```
+
+Example scene (`scenes/movie-night.yaml`):
+
+```yaml
+lights:
+  floor-lamp-1:
+    on: true
+    brightness: 30
+    white: 3000
+  floor-lamp-2:
+    on: false
+  neon-rope-black:
+    on: true
+    brightness: 50
+    color: [0, 0, 128]
+```
+
+Use `all:` to set every device at once, with optional per-light overrides:
+
+```yaml
+all:
+  on: true
+  brightness: 20
+  white: 3000
+lights:
+  neon-rope-black:
+    brightness: 100
+    color: [255, 0, 0]
+```
+
+Supported keys: `on` (bool), `brightness` (0-100), `color` ([r, g, b]), `white` (kelvin).
 
 ## Protocol
 

@@ -1,0 +1,5 @@
+# All lights on, bright white
+all:
+  on: true
+  brightness: 100
+  white: 4000

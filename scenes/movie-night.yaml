@@ -1,0 +1,16 @@
+# Dim warm floor lamps, blue neon ropes
+lights:
+  floor-lamp-1:
+    on: true
+    brightness: 30
+    white: 3000
+  floor-lamp-2:
+    on: false
+  neon-rope-black:
+    on: true
+    brightness: 50
+    color: [0, 0, 128]
+  neon-rope-white:
+    on: true
+    brightness: 50
+    color: [0, 0, 128]

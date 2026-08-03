@@ -1,0 +1,18 @@
+# Classic Christmas — red and green alternating
+lights:
+  floor-lamp-1:
+    on: true
+    brightness: 80
+    color: [255, 0, 0]
+  floor-lamp-2:
+    on: true
+    brightness: 80
+    color: [0, 255, 0]
+  neon-rope-black:
+    on: true
+    brightness: 100
+    color: [255, 0, 0]
+  neon-rope-white:
+    on: true
+    brightness: 100
+    color: [0, 255, 0]
