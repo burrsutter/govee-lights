@@ -1,0 +1,26 @@
+{
+  "floor-lamp-1": {
+    "on": true,
+    "brightness": 100,
+    "color": null,
+    "white": 4000
+  },
+  "floor-lamp-2": {
+    "on": true,
+    "brightness": 100,
+    "color": null,
+    "white": 4000
+  },
+  "neon-rope-black": {
+    "on": true,
+    "brightness": 100,
+    "color": null,
+    "white": 4000
+  },
+  "neon-rope-white": {
+    "on": true,
+    "brightness": 100,
+    "color": null,
+    "white": 4000
+  }
+}

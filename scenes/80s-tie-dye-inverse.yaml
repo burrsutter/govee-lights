@@ -1,0 +1,19 @@
+# 80s tie-dye inverse — complementary colors of the original palette
+transition: 4
+lights:
+  floor-lamp-1:
+    on: true
+    brightness: 100
+    color: [0, 235, 108]    # spring green (complement of hot pink)
+  floor-lamp-2:
+    on: true
+    brightness: 100
+    color: [0, 90, 255]     # electric blue (complement of orange)
+  neon-rope-black:
+    on: true
+    brightness: 100
+    color: [255, 0, 0]      # red (complement of cyan)
+  neon-rope-white:
+    on: true
+    brightness: 100
+    color: [0, 255, 0]      # green (complement of magenta)

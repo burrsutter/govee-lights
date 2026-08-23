@@ -1,0 +1,19 @@
+# 80s tie-dye — each light a different groovy color
+transition: 4
+lights:
+  floor-lamp-1:
+    on: true
+    brightness: 100
+    color: [255, 20, 147]
+  floor-lamp-2:
+    on: true
+    brightness: 100
+    color: [255, 165, 0]
+  neon-rope-black:
+    on: true
+    brightness: 100
+    color: [0, 255, 255]
+  neon-rope-white:
+    on: true
+    brightness: 100
+    color: [255, 0, 255]

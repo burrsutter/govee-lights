@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Apply a scene (YAML preset) to Govee lights."""
 
+import json
 import os
 import sys
 import time
@@ -8,6 +9,7 @@ import yaml
 from control import DEVICES, turn_on, turn_off, set_brightness, set_color, set_white
 
 SCENES_DIR = os.path.join(os.path.dirname(__file__), "scenes")
+STATE_FILE = os.path.join(os.path.dirname(__file__), ".scene-state.json")
 
 
 def list_scenes():
@@ -79,6 +81,115 @@ def apply_settings(name, cfg):
         set_white(ip, cfg["white"])
 
 
+def load_state():
+    """Load persisted light state. Returns empty dict if file missing."""
+    if not os.path.exists(STATE_FILE):
+        return {}
+    with open(STATE_FILE) as f:
+        return json.load(f)
+
+
+def save_state(state):
+    """Persist light state to disk."""
+    with open(STATE_FILE, "w") as f:
+        json.dump(state, f, indent=2)
+
+
+def lerp(a, b, t):
+    """Linear interpolate from a to b at fraction t (0.0–1.0). Returns int."""
+    return int(round(a + (b - a) * t))
+
+
+def lerp_color(start_rgb, end_rgb, t):
+    """Lerp each RGB channel. Returns list of 3 ints."""
+    return [lerp(s, e, t) for s, e in zip(start_rgb, end_rgb)]
+
+
+def apply_transition(device_settings, transition_secs):
+    """Fade all devices from current state to target over transition_secs."""
+    state = load_state()
+    steps = max(5, int(transition_secs * 5))
+    interval = transition_secs / steps
+
+    # Snapshot start and target per device before the loop begins
+    transitions = {
+        name: {"start": state.get(name, {}), "target": target}
+        for name, target in device_settings.items()
+    }
+
+    for step in range(steps):
+        t = (step + 1) / steps  # 1/steps on first step, 1.0 on last
+        step_start = time.time()
+        is_first = step == 0
+        is_last = step == steps - 1
+
+        for name, info in transitions.items():
+            ip = DEVICES[name]
+            start = info["start"]
+            target = info["target"]
+
+            target_on = target.get("on", True)
+            start_on = start.get("on", True)  # assume on if state unknown
+
+            # off → on: power on at first step; brightness will fade from 0
+            if is_first and target_on and not start_on:
+                turn_on(ip)
+                time.sleep(0.05)
+
+            # Brightness: lerp from start to target (0 when off)
+            start_bri = 0 if not start_on else start.get("brightness", 100)
+            end_bri = 0 if not target_on else target.get("brightness", 100)
+            set_brightness(ip, lerp(start_bri, end_bri, t))
+            time.sleep(0.05)
+
+            # Color / white: interpolate within same mode, switch at midpoint across modes
+            start_color = start.get("color")
+            start_white = start.get("white")
+            target_color = target.get("color")
+            target_white = target.get("white")
+
+            if target_color and start_color:
+                # color → color: lerp each channel
+                set_color(ip, *lerp_color(start_color, target_color, t))
+            elif target_white and start_white:
+                # white → white: lerp kelvin
+                set_white(ip, lerp(start_white, target_white, t))
+            elif target_color and start_white:
+                # white → color: keep white first half, switch to color at midpoint
+                if t >= 0.5:
+                    set_color(ip, *target_color)
+                else:
+                    set_white(ip, start_white)
+            elif target_white and start_color:
+                # color → white: keep color first half, switch to white at midpoint
+                if t >= 0.5:
+                    set_white(ip, target_white)
+                else:
+                    set_color(ip, *start_color)
+            elif target_color:
+                set_color(ip, *target_color)
+            elif target_white:
+                set_white(ip, target_white)
+
+            # on → off: power off only at final step (after brightness hits 0)
+            if is_last and not target_on:
+                turn_off(ip)
+
+        elapsed = time.time() - step_start
+        time.sleep(max(0, interval - elapsed))
+
+    # Persist final state
+    for name, info in transitions.items():
+        target = info["target"]
+        state[name] = {
+            "on": target.get("on", True),
+            "brightness": target.get("brightness", 100),
+            "color": target.get("color"),
+            "white": target.get("white"),
+        }
+    save_state(state)
+
+
 def main():
     if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help"):
         print("Usage:")
@@ -105,21 +216,37 @@ def main():
         sys.exit(1)
 
     scene_name = os.path.basename(path).removesuffix(".yaml")
+    transition = scene.get("transition") or 0
+
     print(f"Applying scene: {scene_name}")
 
-    for name, cfg in device_settings.items():
-        parts = []
-        if "on" in cfg:
-            parts.append("ON" if cfg["on"] else "OFF")
-        if "brightness" in cfg:
-            parts.append(f"brightness={cfg['brightness']}%")
-        if "color" in cfg:
-            parts.append(f"color={cfg['color']}")
-        if "white" in cfg:
-            parts.append(f"white={cfg['white']}K")
-        apply_settings(name, cfg)
-        print(f"  {name}: {', '.join(parts)}")
-        time.sleep(0.1)
+    if transition and os.path.exists(STATE_FILE):
+        print(f"  Fading over {transition}s ({max(5, int(transition * 5))} steps)...")
+        apply_transition(device_settings, transition)
+    else:
+        if transition:
+            print("  No prior state — applying instantly.")
+        state = load_state()
+        for name, cfg in device_settings.items():
+            parts = []
+            if "on" in cfg:
+                parts.append("ON" if cfg["on"] else "OFF")
+            if "brightness" in cfg:
+                parts.append(f"brightness={cfg['brightness']}%")
+            if "color" in cfg:
+                parts.append(f"color={cfg['color']}")
+            if "white" in cfg:
+                parts.append(f"white={cfg['white']}K")
+            apply_settings(name, cfg)
+            print(f"  {name}: {', '.join(parts)}")
+            time.sleep(0.1)
+            state[name] = {
+                "on": cfg.get("on", True),
+                "brightness": cfg.get("brightness", 100),
+                "color": cfg.get("color"),
+                "white": cfg.get("white"),
+            }
+        save_state(state)
 
     print("Done.")
 

@@ -1,3 +1,4 @@
 # All lights off
+transition: 4
 all:
   on: false

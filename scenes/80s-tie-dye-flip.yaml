@@ -1,0 +1,19 @@
+# 80s tie-dye flip — floor lamps and rope lights swap colors
+transition: 4
+lights:
+  floor-lamp-1:
+    on: true
+    brightness: 100
+    color: [0, 255, 255]    # cyan (was neon-rope-black)
+  floor-lamp-2:
+    on: true
+    brightness: 100
+    color: [255, 0, 255]    # magenta (was neon-rope-white)
+  neon-rope-black:
+    on: true
+    brightness: 100
+    color: [255, 20, 147]   # hot pink (was floor-lamp-1)
+  neon-rope-white:
+    on: true
+    brightness: 100
+    color: [255, 165, 0]    # orange (was floor-lamp-2)

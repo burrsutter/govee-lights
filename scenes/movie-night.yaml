@@ -1,4 +1,5 @@
 # Dim warm floor lamps, blue neon ropes
+transition: 4
 lights:
   floor-lamp-1:
     on: true
