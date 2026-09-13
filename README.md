@@ -120,6 +120,17 @@ old code requirement and the job keeps failing with `needs LWCR update`. The app
 `--enable-launch-at-login` path calls `SMAppService.unregister()` first, which is
 what actually clears it.
 
+**Re-signing resets Local Network permission.** macOS keys local-network access to
+the app's signing *identity*, so changing it (ad-hoc to Apple Development, or a new
+certificate) makes this a different app to TCC and silently drops the old grant.
+The symptom is the menu bar icon appearing normally while every light shows as
+unreachable -- the CLI still works, because your terminal has its own grant. Fix it
+in **System Settings > Privacy & Security > Local Network**: switch the app on, or
+toggle it off and on if a stale entry is left over from the previous identity. If
+the app is missing from that list entirely, force a probe (the refresh button) to
+trigger the approval prompt. Note that `tccutil reset LocalNetwork <bundle-id>`
+reports failure when no grant exists yet, which is expected rather than an error.
+
 Verify without rebooting by driving the login job directly:
 
 ```bash
