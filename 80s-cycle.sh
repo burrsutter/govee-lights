@@ -3,9 +3,6 @@
 
 SCENES=(
   80s-tie-dye
-  80s-tie-dye-shift
-  80s-tie-dye-flip
-  80s-tie-dye-inverse
   all-off
 )
 

@@ -4,16 +4,16 @@ lights:
   floor-lamp-1:
     on: true
     brightness: 100
-    color: [255, 20, 147]
+    color: [0, 255, 255]    # cyan
   floor-lamp-2:
     on: true
     brightness: 100
-    color: [255, 165, 0]
+    color: [255, 0, 255]    # magenta
   neon-rope-black:
     on: true
     brightness: 100
-    color: [0, 255, 255]
+    color: [255, 20, 147]   # hot pink
   neon-rope-white:
     on: true
     brightness: 100
-    color: [255, 0, 255]
+    color: [255, 165, 0]    # orange

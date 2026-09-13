@@ -14,11 +14,8 @@ final class GoveeSceneLoaderTests: XCTestCase {
         let result = GoveeSceneLoader.loadScenes(from: scenesDirectory)
 
         XCTAssertTrue(result.errors.isEmpty, result.errors.joined(separator: "\n"))
-        XCTAssertEqual(result.presets.count, 8)
+        XCTAssertEqual(result.presets.count, 5)
         XCTAssertEqual(Set(result.presets.map(\.id)), [
-            "80s-tie-dye-flip",
-            "80s-tie-dye-inverse",
-            "80s-tie-dye-shift",
             "80s-tie-dye",
             "all-off",
             "all-white",
