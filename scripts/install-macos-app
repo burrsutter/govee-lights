@@ -1,0 +1,30 @@
+#!/bin/bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SOURCE_APP="$REPO_ROOT/dist/GoveeMenuBar.app"
+INSTALL_DIR="$HOME/Applications"
+INSTALLED_APP="$INSTALL_DIR/GoveeMenuBar.app"
+CONFIG_DIR="$HOME/.config/govee-lights"
+SCENES_DIR="$CONFIG_DIR/scenes"
+
+"$SCRIPT_DIR/build-macos-app"
+
+mkdir -p "$INSTALL_DIR" "$CONFIG_DIR" "$SCENES_DIR"
+ditto "$SOURCE_APP" "$INSTALLED_APP"
+
+if [ -f "$REPO_ROOT/.env" ] && [ ! -f "$CONFIG_DIR/.env" ]; then
+    install -m 600 "$REPO_ROOT/.env" "$CONFIG_DIR/.env"
+fi
+
+for scene in "$REPO_ROOT"/scenes/*.yaml "$REPO_ROOT"/scenes/*.yml; do
+    [ -f "$scene" ] || continue
+    destination="$SCENES_DIR/$(basename "$scene")"
+    if [ ! -f "$destination" ]; then
+        install -m 644 "$scene" "$destination"
+    fi
+done
+
+codesign --verify --deep --strict "$INSTALLED_APP"
+echo "$INSTALLED_APP"

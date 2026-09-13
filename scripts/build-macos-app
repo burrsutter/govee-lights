@@ -1,0 +1,47 @@
+#!/bin/bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+BUILD_ROOT="$REPO_ROOT/.build"
+APP_ROOT="$REPO_ROOT/dist/GoveeMenuBar.app"
+
+mkdir -p "$BUILD_ROOT/ModuleCache"
+CLANG_MODULE_CACHE_PATH="$BUILD_ROOT/ModuleCache" \
+SWIFT_MODULE_CACHE_PATH="$BUILD_ROOT/ModuleCache" \
+swift build -c release --disable-sandbox --scratch-path "$BUILD_ROOT"
+
+BIN_DIR="$(CLANG_MODULE_CACHE_PATH="$BUILD_ROOT/ModuleCache" \
+    SWIFT_MODULE_CACHE_PATH="$BUILD_ROOT/ModuleCache" \
+    swift build -c release --disable-sandbox --scratch-path "$BUILD_ROOT" --show-bin-path)"
+
+rm -rf "$APP_ROOT"
+mkdir -p "$APP_ROOT/Contents/MacOS" "$APP_ROOT/Contents/Resources" \
+    "$APP_ROOT/Contents/Library/LaunchAgents"
+install -m 755 "$BIN_DIR/GoveeMenuBar" "$APP_ROOT/Contents/MacOS/GoveeMenuBar"
+install -m 755 "$BIN_DIR/GoveeLoginLauncher" "$APP_ROOT/Contents/MacOS/GoveeLoginLauncher"
+install -m 644 "$REPO_ROOT/packaging/Info.plist" "$APP_ROOT/Contents/Info.plist"
+install -m 644 "$REPO_ROOT/packaging/com.burrsutter.GoveeMenuBar.login.plist" \
+    "$APP_ROOT/Contents/Library/LaunchAgents/com.burrsutter.GoveeMenuBar.login.plist"
+
+# SMAppService requires a signed app. Prefer an installed Apple Development
+# identity; fall back to ad-hoc signing so the bundle remains runnable elsewhere.
+SIGNING_IDENTITY="${GOVEE_CODESIGN_IDENTITY:-}"
+if [ -z "$SIGNING_IDENTITY" ]; then
+    SIGNING_IDENTITY="$(security find-identity -v -p codesigning \
+        | sed -n 's/.*"\(Apple Development:.*\)"/\1/p' \
+        | head -n 1)"
+fi
+if [ -z "$SIGNING_IDENTITY" ]; then
+    SIGNING_IDENTITY="-"
+fi
+
+codesign --force --timestamp=none --sign "$SIGNING_IDENTITY" \
+    --identifier com.burrsutter.GoveeMenuBar.LoginLauncher \
+    "$APP_ROOT/Contents/MacOS/GoveeLoginLauncher"
+codesign --force --timestamp=none --sign "$SIGNING_IDENTITY" \
+    --identifier com.burrsutter.GoveeMenuBar "$APP_ROOT"
+codesign --verify --deep --strict "$APP_ROOT"
+
+echo "Signed with: $SIGNING_IDENTITY"
+echo "$APP_ROOT"

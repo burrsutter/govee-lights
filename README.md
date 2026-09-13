@@ -80,3 +80,89 @@ Supported keys: `on` (bool), `brightness` (0-100), `color` ([r, g, b]), `white` 
 - Commands: UDP unicast to device IP, port `4003`
 - Payload: `{"msg": {"cmd": "...", "data": {...}}}`
 - Must enable **LAN Control** in the Govee app per device (Device → Gear → LAN Control)
+
+## Native Mac App (GoveeMenuBar)
+
+SwiftUI menu bar app that mirrors the Python LAN control, no cloud or API key.
+
+### Quick Start
+
+```bash
+# 1. Secrets
+cp .env.example .env
+# edit GOVEE_LIGHT_IPS if your IPs differ (see .env.example)
+
+# 2. CLI (bash wrapper around Python LAN protocol)
+scripts/govee status
+scripts/govee on all
+scripts/govee color 255 0 128 neon-rope-black
+scripts/govee white 4000 all
+scripts/govee discover   # multicast scan ~6s
+
+# 3. Menu Bar App
+swift run GoveeMenuBar          # icon: lightstrip.2
+# or build release
+swift build -c release --disable-sandbox
+open .build/debug/GoveeMenuBar
+```
+
+For a persistent app that launches after login:
+
+```bash
+scripts/install-macos-app
+open -n ~/Applications/GoveeMenuBar.app --args --enable-launch-at-login
+```
+
+The installed app has a **Launch at Login** checkbox in its menu. macOS may ask
+you to approve it under **System Settings → General → Login Items**. The installer
+copies `.env` to `~/.config/govee-lights/.env` only when that file does not already
+exist, keeping the installed app independent of this repository.
+
+The installer also seeds `~/.config/govee-lights/scenes/` with the repository's
+YAML scenes without overwriting existing files. Add new `.yaml` or `.yml` files to
+that directory and restart the app; they will appear in the searchable scene picker.
+The filename becomes the scene ID and display name. Optional top-level `name:` and
+`icon:` fields can override the displayed label and SF Symbol.
+
+> Requires **LAN Control** enabled per device (Govee app → Device → Gear → LAN Control) and same LAN/VLAN. UDP ports 4001-4003 must not be firewalled.
+
+### Configuration
+
+Secrets live in `.env` (git-ignored, see `.env.example`).
+
+```bash
+GOVEE_LIGHT_IPS=192.168.4.49,192.168.4.28,192.168.4.42,192.168.4.43
+# Alternatives:
+# GOVEE_LIGHTS_JSON={"floor-lamp-1":"192.168.4.49",...}
+# GOVEE_FLOOR_LAMP_1_IP=192.168.4.49
+```
+
+Resolution order: shell env → `.env` next to executable/repo → `~/.config/govee-lights/.env` → defaults. See `GoveeMenuBar/Services/GoveeConfig.swift`.
+
+### App
+
+- **Linked** toggle + **All Lights** sliders (brightness, ColorPicker → Apply, temperature 2000-9000K)
+- **Independent** per-light disclosure with on/off, brightness, color, white
+- **Presets**: Bright White, Movie (warm floor + blue neon), Vibrant, Ambient, 80s Tie-Dye, All Off — maps to `scenes/*.yaml`
+- Polling is optimistic (UDP fire-and-forget); state is local, no HTTP GET. Future `devStatus` listener can be added.
+
+### Project Layout
+
+```
+GoveeMenuBar/
+  GoveeMenuBarApp.swift          # MenuBarExtra, GoveeManager @StateObject
+  Models/GoveeDevice.swift       # GoveeDevice, GoveeState, RGBColor, GoveePreset
+  Services/
+    GoveeConfig.swift            # env/.env resolution
+    GoveeLANClient.swift         # actor, UDP to :4003 (turn/brightness/colorwc)
+    GoveeDiscovery.swift         # BSD multicast scan 239.255.255.250:4001→:4002
+    GoveeManager.swift           # @MainActor, presets, all/per-device control
+  Views/
+    GoveeMenuBarView.swift
+    GoveeAllLightsView.swift
+    GoveeLightControlView.swift
+scripts/govee                    # bash CLI (sources .env, delegates to python sockets)
+Package.swift                    # swift-tools-version 5.9, macOS 14
+```
+
+See also [`elgato-key-lights`](../elgato-key-lights) for the Elgato Key Light Air companion app.

@@ -2,3 +2,8 @@
 __pycache__/
 *.pyc
 .env
+.build/
+.swiftpm/
+*.xcodeproj/
+DerivedData/
+dist/

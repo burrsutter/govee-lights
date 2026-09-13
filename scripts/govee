@@ -1,0 +1,195 @@
+#!/bin/bash
+# Govee LAN controller — mirrors govee-lights/control.py but sources .env
+# Protocol: UDP unicast to port 4003, discovery via multicast 239.255.255.250:4001/4002
+# Requires LAN Control enabled in Govee app per device.
+# Compatible with macOS bash 3.2 (no associative arrays).
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+_SAVED_IPS="${GOVEE_LIGHT_IPS:-}"
+_SAVED_JSON="${GOVEE_LIGHTS_JSON:-}"
+for env_file in "$REPO_ROOT/.env" "./.env" "$HOME/.config/govee-lights/.env"; do
+  if [ -f "$env_file" ]; then set -a; source "$env_file"; set +a; break; fi
+done
+if [ -n "$_SAVED_IPS" ]; then GOVEE_LIGHT_IPS="$_SAVED_IPS"; fi
+if [ -n "$_SAVED_JSON" ]; then GOVEE_LIGHTS_JSON="$_SAVED_JSON"; fi
+unset _SAVED_IPS _SAVED_JSON
+
+CMD_PORT=4003
+ORDER="floor-lamp-1 floor-lamp-2 neon-rope-black neon-rope-white"
+DEFAULT_IPS="192.168.4.49 192.168.4.28 192.168.4.42 192.168.4.43"
+
+# Helpers — delegate device resolution to python (handles JSON, env overrides)
+get_ip_for_name() {
+  python3 - "$1" << 'PY' 2>/dev/null
+import os, json, sys
+name = sys.argv[1]
+order = ["floor-lamp-1","floor-lamp-2","neon-rope-black","neon-rope-white"]
+defaults = ["192.168.4.49","192.168.4.28","192.168.4.42","192.168.4.43"]
+# JSON map wins
+if os.environ.get("GOVEE_LIGHTS_JSON"):
+    try:
+        d = json.loads(os.environ["GOVEE_LIGHTS_JSON"])
+        if name in d: print(d[name]); sys.exit(0)
+    except: pass
+# comma-separated IPs
+if os.environ.get("GOVEE_LIGHT_IPS"):
+    ips = [s.strip() for s in os.environ["GOVEE_LIGHT_IPS"].split(",") if s.strip()]
+    for i, n in enumerate(order):
+        if n == name and i < len(ips): print(ips[i]); sys.exit(0)
+# per-device env
+env_key = "GOVEE_" + name.replace("-","_").upper() + "_IP"
+if os.environ.get(env_key): print(os.environ[env_key]); sys.exit(0)
+# fallback
+for i, n in enumerate(order):
+    if n == name: print(defaults[i]); sys.exit(0)
+sys.exit(1)
+PY
+}
+
+list_devices() {
+  python3 << 'PY' 2>/dev/null
+import os, json
+order = ["floor-lamp-1","floor-lamp-2","neon-rope-black","neon-rope-white"]
+defaults = ["192.168.4.49","192.168.4.28","192.168.4.42","192.168.4.43"]
+devices = {}
+if os.environ.get("GOVEE_LIGHTS_JSON"):
+    try:
+        devices = json.loads(os.environ["GOVEE_LIGHTS_JSON"])
+    except: pass
+if not devices and os.environ.get("GOVEE_LIGHT_IPS"):
+    ips = [s.strip() for s in os.environ["GOVEE_LIGHT_IPS"].split(",") if s.strip()]
+    for i, n in enumerate(order):
+        if i < len(ips): devices[n] = ips[i]
+if not devices:
+    for i, n in enumerate(order):
+        devices[n] = defaults[i]
+# per-device overrides
+for n in order:
+    k = "GOVEE_" + n.replace("-","_").upper() + "_IP"
+    if os.environ.get(k): devices[n] = os.environ[k]
+for k in sorted(devices): print(f"{k}\t{devices[k]}")
+PY
+}
+
+usage() {
+  echo "Usage: govee <command> [options] [name|all]"
+  echo ""
+  echo "Commands:"
+  echo "  on [name|all]                 Turn on"
+  echo "  off [name|all]                Turn off"
+  echo "  brightness <0-100> [name|all] Set brightness"
+  echo "  color <r> <g> <b> [name|all]  Set RGB color (0-255)"
+  echo "  white <kelvin> [name|all]     Set white temperature (2000-9000K)"
+  echo "  status                        Show configured devices"
+  echo "  discover                      Scan LAN for Govee devices (multicast)"
+  echo ""
+  echo "Device names: floor-lamp-1, floor-lamp-2, neon-rope-black, neon-rope-white or all"
+  echo "Config: .env GOVEE_LIGHT_IPS / GOVEE_LIGHTS_JSON (see .env.example)"
+  echo ""
+  echo "Examples:"
+  echo "  govee on all"
+  echo "  govee off floor-lamp-1"
+  echo "  govee color 255 0 128 neon-rope-black"
+  echo "  govee white 4000 all"
+  echo "  govee brightness 30 all"
+  exit 1
+}
+
+send_cmd() {
+  local ip=$1
+  local payload=$2
+  python3 -c "import socket,json; s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.sendto(json.dumps({'msg': json.loads('''$payload''')}).encode(), ('$ip', $CMD_PORT)); s.close()" 2>/dev/null
+}
+
+resolve_ips() {
+  local target=${1:-all}
+  if [ "$target" = "all" ]; then
+    list_devices | while IFS=$(printf '\t') read -r name ip; do echo "$ip $name"; done
+  else
+    ip=$(get_ip_for_name "$target")
+    if [ -z "$ip" ]; then echo "Unknown device: $target" >&2; exit 1; fi
+    echo "$ip $target"
+  fi
+}
+
+[ $# -eq 0 ] && usage
+cmd=$1; shift
+
+case "$cmd" in
+  on)
+    target=${1:-all}
+    resolve_ips "$target" | while read -r ip name; do
+      send_cmd "$ip" '{"cmd":"turn","data":{"value":1}}'
+      echo "  $ip ($name): ON"
+    done
+    ;;
+  off)
+    target=${1:-all}
+    resolve_ips "$target" | while read -r ip name; do
+      send_cmd "$ip" '{"cmd":"turn","data":{"value":0}}'
+      echo "  $ip ($name): OFF"
+    done
+    ;;
+  brightness|dim)
+    [ -z "${1:-}" ] && usage
+    level=$1; target=${2:-all}
+    resolve_ips "$target" | while read -r ip name; do
+      send_cmd "$ip" "{\"cmd\":\"brightness\",\"data\":{\"value\":$level}}"
+      echo "  $ip ($name): brightness $level%"
+    done
+    ;;
+  color)
+    [ -z "${3:-}" ] && usage
+    r=$1; g=$2; b=$3; target=${4:-all}
+    resolve_ips "$target" | while read -r ip name; do
+      send_cmd "$ip" "{\"cmd\":\"colorwc\",\"data\":{\"color\":{\"r\":$r,\"g\":$g,\"b\":$b},\"colorTemInKelvin\":0}}"
+      echo "  $ip ($name): color ($r,$g,$b)"
+    done
+    ;;
+  white)
+    [ -z "${1:-}" ] && usage
+    k=$1; target=${2:-all}
+    resolve_ips "$target" | while read -r ip name; do
+      send_cmd "$ip" "{\"cmd\":\"colorwc\",\"data\":{\"color\":{\"r\":0,\"g\":0,\"b\":0},\"colorTemInKelvin\":$k}}"
+      echo "  $ip ($name): white ${k}K"
+    done
+    ;;
+  status)
+    echo "Govee devices (from .env / defaults):"
+    list_devices | while IFS=$(printf '\t') read -r name ip; do printf "  %-18s %s\n" "$name" "$ip"; done
+    ;;
+  discover)
+    echo "Scanning for Govee devices (multicast, ~6s) — requires LAN Control enabled..."
+    if [ -f "$REPO_ROOT/../govee-lights/discover.py" ]; then
+      python3 "$REPO_ROOT/../govee-lights/discover.py" 2>&1 || true
+    else
+      python3 << 'PY' 2>&1
+import socket,json,time
+MULTICAST_GRP='239.255.255.250'; SEND_PORT=4001; RECV_PORT=4002
+msg=json.dumps({'msg':{'cmd':'scan','data':{'account_topic':'reserve'}}}).encode()
+rs=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+rs.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+try:
+ rs.bind(('',RECV_PORT))
+ rs.settimeout(1)
+ ss=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+ found={}
+ deadline=time.time()+6
+ last=0
+ while time.time()<deadline:
+  if time.time()-last>2:
+   ss.sendto(msg,(MULTICAST_GRP,SEND_PORT)); last=time.time()
+  try:
+   data,addr=rs.recvfrom(4096)
+   d=json.loads(data)['msg']['data']; ip=d.get('ip',addr[0]); found[ip]=d
+  except: pass
+ print(f'Found {len(found)} device(s):')
+ [print(f"  {ip} SKU={d.get('sku')} device={d.get('device')}") for ip,d in sorted(found.items())]
+except Exception as e:
+ print(f'Scan failed (sandbox?): {e}')
+PY
+    fi
+    ;;
+  *) usage ;;
+esac
