@@ -19,6 +19,61 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+## Verifying a New Mac
+
+Run this before trusting the name-to-device mapping in the table above. Discovery
+reports SKUs but cannot tell identical units apart — the two H6076 lamps look the
+same to the protocol, as do the two H61D5 ropes. Only a physical one-at-a-time
+test proves which name drives which light.
+
+```bash
+# 1. Config — .env is git-ignored, so a fresh clone has none and falls back to defaults
+cp .env.example .env
+
+# 2. Reachability
+for ip in 192.168.4.49 192.168.4.28 192.168.4.42 192.168.4.43; do
+  ping -c 2 -W 1500 "$ip" >/dev/null 2>&1 && echo "$ip reachable" || echo "$ip NO PING"
+done
+
+# 3. LAN Control on? Devices only answer multicast when it is enabled per device.
+scripts/govee discover    # expect 4: H6076 x2 (lamps) + H61D5 x2 (ropes)
+
+# 4. Names resolve to the IPs you expect
+scripts/govee status
+```
+
+Then identify each light individually — all off, one device lit in a distinct
+color, confirmed by eye before moving on:
+
+```bash
+scripts/govee off all
+for spec in "floor-lamp-1 255 0 0" "floor-lamp-2 0 255 0" \
+            "neon-rope-black 0 80 255" "neon-rope-white 255 0 255"; do
+  set -- $spec
+  scripts/govee on "$1"
+  scripts/govee brightness 80 "$1"
+  scripts/govee color "$2" "$3" "$4" "$1"
+  read -r -p "Lit light should be: $1 — press Enter when confirmed "
+  scripts/govee off "$1"
+done
+```
+
+If a pair turns out swapped, fix it in `.env`. `GOVEE_LIGHT_IPS` is **positional**
+(`floor-lamp-1, floor-lamp-2, neon-rope-black, neon-rope-white`), so reorder the
+IPs — or switch to `GOVEE_LIGHTS_JSON` for an explicit map — and re-run the test.
+
+> Commands are fire-and-forget UDP: `scripts/govee` printing `ON` means the packet
+> was sent, not that the device acted on it. `discover` is the only command that
+> gets a real response back, so trust your eyes over the CLI output here.
+
+Finally, build the menu bar app — a fresh clone has no `.build/` or `dist/`, so
+nothing appears in the menu bar until you do:
+
+```bash
+scripts/install-macos-app
+open -n ~/Applications/GoveeMenuBar.app --args --enable-launch-at-login
+```
+
 ## Usage
 
 ```bash
