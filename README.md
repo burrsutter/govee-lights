@@ -74,6 +74,61 @@ scripts/install-macos-app
 open -n ~/Applications/GoveeMenuBar.app --args --enable-launch-at-login
 ```
 
+### Code signing and Launch at Login
+
+Launch at Login uses `SMAppService`, which pins a code requirement (LWCR) to the
+bundle's signature at registration. **Ad-hoc signatures break this**: each rebuild
+mints a new identity, the stored requirement stops matching, and launchd refuses
+to spawn the job (`spawn failed`, `EX_CONFIG 78`). A real signing identity is
+stable across rebuilds and avoids it. `scripts/build-macos-app` picks one up
+automatically and warns loudly if it has to fall back to ad-hoc.
+
+Creating the certificate needs full Xcode (Command Line Tools alone cannot do it,
+and also has no XCTest, so `swift test` will not run):
+
+1. **Xcode > Settings > Apple Accounts**, add your Apple ID (a free one works)
+2. Click the `>` on the account row, then **Manage Certificates...**
+3. **`+` > Apple Development**
+
+Confirm it is usable — note the `-v`, which means *valid*, not merely present:
+
+```bash
+security find-identity -v -p codesigning    # expect: 1 valid identities found
+```
+
+If that reports `0 valid identities found` while the certificate clearly exists in
+Xcode, the issuing **intermediate** is missing from the keychain. A modern cert is
+issued by WWDR G3; the pre-2023 WWDR intermediate does not satisfy it, and
+`codesign` fails with `unable to build chain to self-signed root` /
+`errSecInternalComponent`. Note that `security verify-cert` may still report
+success here, because it consults system trust rather than the keychain:
+
+```bash
+curl -O https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer
+security import AppleWWDRCAG3.cer -k ~/Library/Keychains/login.keychain-db
+```
+
+After **any** reinstall, refresh the login registration through the app itself:
+
+```bash
+open -n ~/Applications/GoveeMenuBar.app --args --enable-launch-at-login
+```
+
+Do **not** use `launchctl bootout` to reset it. That removes the launchd job but
+leaves the Background Task Management record stale, so re-registering reuses the
+old code requirement and the job keeps failing with `needs LWCR update`. The app's
+`--enable-launch-at-login` path calls `SMAppService.unregister()` first, which is
+what actually clears it.
+
+Verify without rebooting by driving the login job directly:
+
+```bash
+pkill -f "GoveeMenuBar.app/Contents/MacOS/GoveeMenuBar"
+launchctl kickstart "gui/$(id -u)/com.burrsutter.GoveeMenuBar.login"
+sleep 5 && pgrep -f "MacOS/GoveeMenuBar" && echo "launch at login works"
+launchctl print "gui/$(id -u)/com.burrsutter.GoveeMenuBar.login" | grep -E "last exit|job state"
+```
+
 ## Usage
 
 ```bash

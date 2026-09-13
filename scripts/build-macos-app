@@ -34,6 +34,29 @@ if [ -z "$SIGNING_IDENTITY" ]; then
 fi
 if [ -z "$SIGNING_IDENTITY" ]; then
     SIGNING_IDENTITY="-"
+    {
+        echo ""
+        echo "WARNING: no valid Apple Development identity -- falling back to AD-HOC signing."
+        echo "  Launch at Login (SMAppService) is unreliable when ad-hoc signed: every"
+        echo "  rebuild mints a new identity, invalidating launchd's stored code"
+        echo "  requirement, and the job then fails with 'spawn failed, EX_CONFIG 78'."
+        echo ""
+        if security find-identity -p codesigning 2>/dev/null | grep -q "Apple Development:"; then
+            echo "  A certificate EXISTS but is not valid. The usual cause is a missing"
+            echo "  issuing intermediate (a cert from WWDR G3 needs the G3 intermediate;"
+            echo "  the pre-2023 WWDR intermediate does not satisfy it). Install it:"
+            echo ""
+            echo "    curl -O https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer"
+            echo "    security import AppleWWDRCAG3.cer -k ~/Library/Keychains/login.keychain-db"
+            echo ""
+            echo "  Confirm with: security find-identity -v -p codesigning"
+        else
+            echo "  No certificate found. Create one in Xcode:"
+            echo "    Settings > Apple Accounts > (your account) > Manage Certificates..."
+            echo "    > + > Apple Development"
+        fi
+        echo ""
+    } >&2
 fi
 
 codesign --force --timestamp=none --sign "$SIGNING_IDENTITY" \
@@ -43,5 +66,9 @@ codesign --force --timestamp=none --sign "$SIGNING_IDENTITY" \
     --identifier com.burrsutter.GoveeMenuBar "$APP_ROOT"
 codesign --verify --deep --strict "$APP_ROOT"
 
-echo "Signed with: $SIGNING_IDENTITY"
+if [ "$SIGNING_IDENTITY" = "-" ]; then
+    echo "Signed with: ad-hoc (NOT a stable identity -- see warning above)"
+else
+    echo "Signed with: $SIGNING_IDENTITY"
+fi
 echo "$APP_ROOT"
